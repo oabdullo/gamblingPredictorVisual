@@ -16,6 +16,7 @@ import json
 from datetime import datetime, timedelta
 import time
 import os
+import streamlit as st
 
 class NFLDataCollector:
     """
@@ -24,8 +25,33 @@ class NFLDataCollector:
     
     def __init__(self):
         self.base_url = "https://api.sportsdata.io/v3/nfl"
-        self.api_key = None  # Set your API key here
+        self.api_key = self._get_api_key()
         
+    def _get_api_key(self):
+        """
+        Get API key from GitHub secrets or environment variables.
+        Priority: GitHub Secrets > Environment Variable > None
+        """
+        try:
+            # Try to get from GitHub Secrets (when deployed on Streamlit Cloud)
+            if hasattr(st, 'secrets') and 'nfl_api_key' in st.secrets:
+                return st.secrets['nfl_api_key']
+        except:
+            pass
+        
+        # Try to get from environment variable
+        api_key = os.getenv('NFL_API_KEY')
+        if api_key:
+            return api_key
+        
+        # Try alternative environment variable names
+        api_key = os.getenv('SPORTSDATA_API_KEY')
+        if api_key:
+            return api_key
+        
+        # Return None if no API key found
+        return None
+    
     def set_api_key(self, api_key):
         """Set the API key for data collection."""
         self.api_key = api_key
@@ -40,16 +66,67 @@ class NFLDataCollector:
         Returns:
             pd.DataFrame: Team statistics
         """
-        # This is a placeholder for real API integration
-        # In production, you would use actual NFL APIs like:
-        # - NFL.com API
-        # - ESPN API
-        # - Pro Football Reference scraping
-        # - SportsData.io API
-        
         print(f"Collecting team stats for {season} season...")
         
-        # Sample team data structure
+        # If API key is available, try to get real data
+        if self.api_key:
+            try:
+                return self._get_real_team_stats(season)
+            except Exception as e:
+                print(f"API call failed, using sample data: {e}")
+        
+        # Fallback to sample data
+        return self._get_sample_team_stats(season)
+    
+    def _get_real_team_stats(self, season):
+        """
+        Get real team stats from API.
+        
+        Args:
+            season (int): NFL season year
+            
+        Returns:
+            pd.DataFrame: Real team statistics
+        """
+        url = f"{self.base_url}/scores/json/TeamSeasonStats/{season}"
+        headers = {'Ocp-Apim-Subscription-Key': self.api_key}
+        
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        # Process the API response into our format
+        team_stats = []
+        for team in data:
+            team_stats.append({
+                'team': team.get('Team', ''),
+                'season': season,
+                'wins': team.get('Wins', 0),
+                'losses': team.get('Losses', 0),
+                'points_for': team.get('PointsFor', 0),
+                'points_against': team.get('PointsAgainst', 0),
+                'offensive_rating': team.get('OffensiveRanking', 75),
+                'defensive_rating': team.get('DefensiveRanking', 75),
+                'avg_points_per_game': team.get('PointsFor', 0) / max(team.get('Games', 1), 1),
+                'avg_points_allowed_per_game': team.get('PointsAgainst', 0) / max(team.get('Games', 1), 1),
+                'turnover_differential': team.get('Takeaways', 0) - team.get('Giveaways', 0),
+                'home_record': f"{team.get('HomeWins', 0)}-{team.get('HomeLosses', 0)}",
+                'away_record': f"{team.get('AwayWins', 0)}-{team.get('AwayLosses', 0)}"
+            })
+        
+        return pd.DataFrame(team_stats)
+    
+    def _get_sample_team_stats(self, season):
+        """
+        Get sample team stats for demonstration.
+        
+        Args:
+            season (int): NFL season year
+            
+        Returns:
+            pd.DataFrame: Sample team statistics
+        """
         teams = [
             'NE', 'KC', 'BUF', 'MIA', 'NYJ', 'BAL', 'CIN', 'CLE', 'PIT',
             'HOU', 'IND', 'JAX', 'TEN', 'DEN', 'LAC', 'LV', 'DAL', 'PHI',

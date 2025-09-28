@@ -67,6 +67,24 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+def check_api_key_status():
+    """Check and display API key status."""
+    from data_collector import NFLDataCollector
+    
+    collector = NFLDataCollector()
+    api_key = collector.api_key
+    
+    if api_key:
+        st.success("✅ API Key loaded successfully - Using real NFL data!")
+    else:
+        st.warning("⚠️ No API key found - Using sample data for demonstration")
+        st.info("""
+        **To use real NFL data:**
+        1. Get an API key from [SportsData.io](https://sportsdata.io)
+        2. Add it to GitHub Secrets as `nfl_api_key`
+        3. Or set environment variable `NFL_API_KEY`
+        """)
+
 @st.cache_resource
 def load_model():
     """Load and cache the prediction model."""
@@ -79,6 +97,9 @@ def main():
     # Header
     st.markdown('<h1 class="main-header">🏈 NFL Game Predictor</h1>', unsafe_allow_html=True)
     st.markdown("---")
+    
+    # Check API key status
+    check_api_key_status()
     
     # Load model
     with st.spinner("Loading prediction model..."):
